@@ -1,0 +1,65 @@
+version: 2
+jobs:
+  dependency_install:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - restore_cache: # special step to restore the dependency cache 
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: package.jsonのSHAが変わらないように避難
+          command: cp ./package.json ./package.json.copy
+      - run:
+          name: npm依存関係のインストール
+          command: npm install
+      - save_cache: # special step to save the dependency cache
+          key: dependency-cache-{{ checksum "package.json.copy" }}
+          paths:
+            - ./node_modules
+  build:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - restore_cache: # special step to restore the dependency cache 
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run: 
+          name: ビルドエラーないかチェック
+          command: npm run build
+  test:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - restore_cache: # special step to restore the dependency cache 
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: ユニットテスト通るかチェック
+          command: npm run test
+      - store_artifacts:
+          path: ./coverage/
+  lint:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - restore_cache: # special step to restore the dependency cache 
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run: 
+          name: コードがコーディング規約に沿っているかチェック
+          command: npm run lint
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - dependency_install
+      - build:
+          requires:
+            - dependency_install
+      - test:
+          requires:
+            - dependency_install
+      - lint:
+          requires:
+            - dependency_install
